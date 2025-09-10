@@ -1,0 +1,76 @@
+import requests
+import pandas as pd
+
+def fetch_from_espn(year, week):
+    """Fetch games for a given season/week from ESPN"""
+    url = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard"
+    params = {"season": year, "week": week}
+    resp = requests.get(url, params=params).json()
+
+    games = []
+    for event in resp.get("events", []):
+        comp = event["competitions"][0]
+        home = comp["competitors"][0]
+        away = comp["competitors"][1]
+
+        games.append({
+            "date": event["date"],
+            "home_team": home["team"]["displayName"],
+            "home_score": home["score"],
+            "away_team": away["team"]["displayName"],
+            "away_score": away["score"],
+            "status": comp["status"]["type"]["description"],
+            "source": "ESPN"
+        })
+    return games
+
+def fetch_from_pfr(year, week):
+    """Fetch schedule from Pro-Football-Reference (works even before games are played)"""
+    url = f"https://www.pro-football-reference.com/years/{year}/games.htm"
+    df = pd.read_html(url)[0]
+    df = df[df["Week"].apply(lambda x: str(x).isdigit())]
+    week_games = df[df["Week"].astype(int) == week]
+
+    games = []
+    for _, row in week_games.iterrows():
+        # Determine home/away from '@' column
+        if "@" in str(row.get("Unnamed: 5", "")):
+            home_team = row["Loser/tie"]
+            away_team = row["Winner/tie"]
+        else:
+            home_team = row["Winner/tie"]
+            away_team = row["Loser/tie"]
+
+        home_score = row.get("Pts.1") if "Pts.1" in row else None
+        away_score = row.get("Pts") if "Pts" in row else None
+
+        games.append({
+            "date": row["Date"],
+            "home_team": home_team,
+            "away_team": away_team,
+            "home_score": home_score if pd.notna(home_score) else None,
+            "away_score": away_score if pd.notna(away_score) else None,
+            "status": "Scheduled" if pd.isna(home_score) else "Final",
+            "source": "PFR"
+        })
+    return games
+
+def fetch_current_results(year=2025, week=2):
+    games = fetch_from_espn(year, week)
+
+    if not games:
+        print(f"⚠️ ESPN has no data for {year} Week {week}, falling back to PFR...")
+        games = fetch_from_pfr(year, week)
+
+    if not games:
+        print(f"❌ No games found for {year} Week {week}")
+        return
+
+    df = pd.DataFrame(games)
+    df.to_csv("data/current_results.csv", index=False)
+    print(f"✅ Saved {len(games)} games for {year} Week {week} (source: {games[0]['source']})")
+
+if __name__ == "__main__":
+    # Example: Week 2, 2025 season
+    fetch_current_results(year=2025, week=2)
+
