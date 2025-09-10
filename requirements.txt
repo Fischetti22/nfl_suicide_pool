@@ -1,0 +1,9 @@
+# Core app and data stack
+streamlit>=1.49.1
+pandas>=2.3.2
+numpy>=2.3.0
+requests>=2.32.0
+
+# Required by pandas.read_html
+lxml>=5.2.0
+
