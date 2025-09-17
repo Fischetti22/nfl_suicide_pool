@@ -1,4 +1,4 @@
-Week,Day,Date,Time,Winner/tie,Unnamed: 5,Loser/tie,Unnamed: 7,Points_Winner,Points_Loser,Yards_Winner,Turnovers_Winner,Yards_Loser,Turnovers_Loser,season
+Week,Day,Date,Time,Winner/tie,Unnamed: 5,Loser/tie,Unnamed: 7,PtsW,PtsL,Yards_Winner,Turnovers_Winner,Yards_Loser,Turnovers_Loser,season
 1,Thu,2020-09-10,8:20PM,Kansas City Chiefs,,Houston Texans,boxscore,34,20,369,0,360,1,2020
 1,Sun,2020-09-13,1:00PM,Seattle Seahawks,@,Atlanta Falcons,boxscore,38,25,383,0,506,2,2020
 1,Sun,2020-09-13,1:00PM,Buffalo Bills,,New York Jets,boxscore,27,17,404,2,254,2,2020

@@ -55,7 +55,7 @@ def fetch_from_pfr(year, week):
         })
     return games
 
-def fetch_current_results(year=2025, week=2):
+def fetch_current_results(year=2025, week=3):
     games = fetch_from_espn(year, week)
 
     if not games:
