@@ -6,4 +6,4 @@ requests>=2.32.0
 
 # Required by pandas.read_html
 lxml>=5.2.0
-
+html5lib
