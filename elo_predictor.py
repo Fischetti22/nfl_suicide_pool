@@ -1,6 +1,9 @@
 import pandas as pd
 import numpy as np
 import requests
+import elo_predictor as _ep
+st.caption(f"ELO module: {_ep.__file__}")
+
 
 START_ELO = 1500
 K = 20
@@ -28,24 +31,86 @@ def update_elo(elo_a, elo_b, score_a, score_b):
     return new_elo_a, new_elo_b
 
 def build_elos(csv_path="data/historical_results.csv"):
+    """
+    Build ELOs from a historical results CSV, tolerating different schemas:
+      • PFR game logs:      Winner/tie, Loser/tie, Pts, Pts.1
+      • Some exports:       Winner/tie, Loser/tie, Points_Winner, Points_Loser (or PtsW/PtsL)
+      • Custom schedules:   home_team, away_team, home_score, away_score
+    """
+    import math
+    import pandas as pd
+
     df = pd.read_csv(csv_path)
+    cols_norm = {str(c).strip().lower(): c for c in df.columns}
+
+    def has(*names):
+        return all(n.lower() in cols_norm for n in names)
+
+    def col(name):
+        return cols_norm.get(name.lower())
+
     elos = {}
 
+    def as_int(x):
+        v = pd.to_numeric(x, errors="coerce")
+        return int(v) if pd.notna(v) and not math.isnan(v) else None
+
+    def row_to_result(row):
+        # Case A: “Winner/tie / Loser/tie” schema (PFR-style)
+        if has("winner/tie", "loser/tie"):
+            winner = row[col("Winner/tie")]
+            loser  = row[col("Loser/tie")]
+
+            # Try several common score-pair column names
+            for wcol, lcol in [
+                ("Points_Winner", "Points_Loser"),
+                ("PtsW", "PtsL"),
+                ("Pts", "Pts.1"),
+            ]:
+                if has(wcol, lcol):
+                    sw = as_int(row[col(wcol)])
+                    sl = as_int(row[col(lcol)])
+                    if sw is not None and sl is not None:
+                        return winner, loser, sw, sl
+
+            # No scores found? Still count a win/loss minimally
+            return winner, loser, 1, 0
+
+        # Case B: home/away schema
+        if has("home_team", "away_team"):
+            home = row[col("home_team")]
+            away = row[col("away_team")]
+            hs = as_int(row[col("home_score")]) if has("home_score") else None
+            as_ = as_int(row[col("away_score")]) if has("away_score") else None
+
+            # If scores missing, skip (can’t determine winner)
+            if hs is None or as_ is None:
+                return None
+
+            if hs > as_:
+                return home, away, hs, as_
+            elif as_ > hs:
+                return away, home, as_, hs
+            else:
+                # tie
+                return home, away, hs, as_
+
+        # Unknown schema → skip
+        return None
+
     for _, row in df.iterrows():
-        team_a = row["Winner/tie"]
-        team_b = row["Loser/tie"]
-        score_a = row["Points_Winner"]
-        score_b = row["Points_Loser"]
+        parsed = row_to_result(row)
+        if not parsed:
+            continue
+        winner, loser, sw, sl = parsed
 
-        if team_a not in elos:
-            elos[team_a] = START_ELO
-        if team_b not in elos:
-            elos[team_b] = START_ELO
+        elos.setdefault(winner, START_ELO)
+        elos.setdefault(loser, START_ELO)
+        new_w, new_l = update_elo(elos[winner], elos[loser], sw, sl)
+        elos[winner], elos[loser] = new_w, new_l
 
-        elos[team_a], elos[team_b] = update_elo(
-            elos[team_a], elos[team_b], score_a, score_b
-        )
     return elos
+
 
 # ---------------------------
 # TEAM STATS SCRAPER
