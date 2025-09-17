@@ -63,7 +63,42 @@ def fetch_current_results(year=2025, week=3):
 st.title("NFL ELO Predictor 🏈")
 
 # Build ratings
-elos = build_elos("data/historical_results.csv")
+# --- robust ELO loader (app-safe) ---
+import os
+from pathlib import Path
+import elo_predictor as _ep
+
+# See which module file the app is importing (helps catch stale deployments)
+st.caption(f"ELO module path: {_ep.__file__}")
+st.caption(f"CWD: {os.getcwd()}")
+
+# Try a few likely CSV locations (works on Streamlit Cloud, Docker, local)
+candidates = [
+    Path("data/historical_results.csv"),
+    Path(__file__).parent / "data" / "historical_results.csv",
+    Path.cwd() / "data" / "historical_results.csv",
+]
+csv_path = next((p for p in candidates if p.exists()), None)
+if not csv_path:
+    st.error("Could not find data/historical_results.csv. Put it in a /data folder next to app.py.")
+    st.stop()
+
+# Show the columns so we know the schema the app sees
+try:
+    _cols = pd.read_csv(csv_path, nrows=1).columns.tolist()
+    st.caption(f"historical_results.csv columns: {_cols}")
+except Exception as e:
+    st.error(f"Failed to open {csv_path}: {e}")
+    st.stop()
+
+# Build ELOs (if this raises, show the traceback in the UI)
+try:
+    elos = build_elos(str(csv_path))
+except Exception as e:
+    st.error(f"build_elos() failed on {csv_path.name}: {e}")
+    st.exception(e)
+    st.stop()
+
 stats = get_team_stats(2025)
 
 # Auto-fetch current matchups
