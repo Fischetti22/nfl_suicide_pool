@@ -1,9 +1,6 @@
 import pandas as pd
 import numpy as np
 import requests
-import elo_predictor as _ep
-st.caption(f"ELO module: {_ep.__file__}")
-
 
 START_ELO = 1500
 K = 20
@@ -34,56 +31,46 @@ def build_elos(csv_path="data/historical_results.csv"):
     """
     Build ELOs from a historical results CSV, tolerating different schemas:
       • PFR game logs:      Winner/tie, Loser/tie, Pts, Pts.1
-      • Some exports:       Winner/tie, Loser/tie, Points_Winner, Points_Loser (or PtsW/PtsL)
+      • Some exports:       Winner/tie, Loser/tie, PtsW, PtsL
       • Custom schedules:   home_team, away_team, home_score, away_score
     """
     import math
-    import pandas as pd
-
     df = pd.read_csv(csv_path)
-    cols_norm = {str(c).strip().lower(): c for c in df.columns}
-
-    def has(*names):
-        return all(n.lower() in cols_norm for n in names)
-
-    def col(name):
-        return cols_norm.get(name.lower())
-
     elos = {}
 
+    # helpers
     def as_int(x):
         v = pd.to_numeric(x, errors="coerce")
         return int(v) if pd.notna(v) and not math.isnan(v) else None
 
-    def row_to_result(row):
-        # Case A: “Winner/tie / Loser/tie” schema (PFR-style)
-        if has("winner/tie", "loser/tie"):
-            winner = row[col("Winner/tie")]
-            loser  = row[col("Loser/tie")]
+    def row_to_winner_loser_with_scores(row):
+        cols = set(map(str, df.columns))
 
-            # Try several common score-pair column names
-            for wcol, lcol in [
-                ("Points_Winner", "Points_Loser"),
-                ("PtsW", "PtsL"),
-                ("Pts", "Pts.1"),
-            ]:
-                if has(wcol, lcol):
-                    sw = as_int(row[col(wcol)])
-                    sl = as_int(row[col(lcol)])
+        # Case A: Winner/Loser present (typical PFR tables)
+        if {"Winner/tie", "Loser/tie"} <= cols:
+            winner = row["Winner/tie"]
+            loser  = row["Loser/tie"]
+
+            # Try several score column pairs in order
+            for wcol, lcol in [("Points_Winner","Points_Loser"),
+                               ("PtsW","PtsL"),
+                               ("Pts","Pts.1")]:
+                if {wcol, lcol} <= cols:
+                    sw = as_int(row.get(wcol))
+                    sl = as_int(row.get(lcol))
                     if sw is not None and sl is not None:
                         return winner, loser, sw, sl
 
-            # No scores found? Still count a win/loss minimally
+            # If scores missing, still record a win/loss
             return winner, loser, 1, 0
 
-        # Case B: home/away schema
-        if has("home_team", "away_team"):
-            home = row[col("home_team")]
-            away = row[col("away_team")]
-            hs = as_int(row[col("home_score")]) if has("home_score") else None
-            as_ = as_int(row[col("away_score")]) if has("away_score") else None
+        # Case B: Home/Away present (custom schedule/results CSV)
+        if {"home_team","away_team"} <= cols:
+            home, away = row["home_team"], row["away_team"]
+            hs = as_int(row.get("home_score"))
+            as_ = as_int(row.get("away_score"))
 
-            # If scores missing, skip (can’t determine winner)
+            # Need actual scores to decide winner; skip if absent
             if hs is None or as_ is None:
                 return None
 
@@ -95,19 +82,22 @@ def build_elos(csv_path="data/historical_results.csv"):
                 # tie
                 return home, away, hs, as_
 
-        # Unknown schema → skip
+        # Unknown schema -> skip
         return None
 
     for _, row in df.iterrows():
-        parsed = row_to_result(row)
+        parsed = row_to_winner_loser_with_scores(row)
         if not parsed:
             continue
         winner, loser, sw, sl = parsed
 
-        elos.setdefault(winner, START_ELO)
-        elos.setdefault(loser, START_ELO)
-        new_w, new_l = update_elo(elos[winner], elos[loser], sw, sl)
-        elos[winner], elos[loser] = new_w, new_l
+        # init if needed
+        if winner not in elos:
+            elos[winner] = START_ELO
+        if loser not in elos:
+            elos[loser] = START_ELO
+
+        elos[winner], elos[loser] = update_elo(elos[winner], elos[loser], sw, sl)
 
     return elos
 
