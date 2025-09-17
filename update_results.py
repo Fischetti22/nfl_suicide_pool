@@ -55,25 +55,37 @@ def fetch_from_pfr(year, week):
         })
     return games
 
-def current_year_week():
+def current_year_week(prefer_upcoming: bool = True):
     now = pd.Timestamp.now()
     year = now.year
-    # ESPN returns week via the API reliably with these params
+    url = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard"
     try:
-        url = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard"
         j = requests.get(url, params={"year": year, "seasontype": 2}, timeout=20).json()
         wk = (j.get("week") or {}).get("number")
-        if isinstance(wk, int) and 1 <= wk <= 23:
-            return year, wk
+        if not (isinstance(wk, int) and 1 <= wk <= 23):
+            return year, 1
+
+        if prefer_upcoming:
+            cw = requests.get(url, params={"year": year, "week": wk, "seasontype": 2}, timeout=20).json()
+            events = cw.get("events", [])
+            def is_final(ev):
+                try:
+                    st = ev["competitions"][0]["status"]["type"]
+                    return st.get("state") == "post" or "final" in st.get("description", "").lower()
+                except Exception:
+                    return False
+            if events and all(is_final(ev) for ev in events):
+                nxt = requests.get(url, params={"year": year, "week": wk + 1, "seasontype": 2}, timeout=20).json()
+                if nxt.get("events"):
+                    return year, wk + 1
+        return year, wk
     except Exception:
-        pass
-    # fallback: assume early season
-    return year, 1
+        return year, 1
 
 
 def fetch_current_results(year=None, week=None):
     if year is None or week is None:
-        y, w = current_year_week()
+        y, w = current_year_week(prefer_upcoming=True)
         year = y if year is None else year
         week = w if week is None else week
 
