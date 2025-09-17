@@ -1,78 +1,32 @@
-import streamlit as st
-import pandas as pd
-import elo_predictor as _ep
-st.caption(f"ELO module path: {_ep.__file__}")
-
-
-# ---------------------------
-# FETCH MATCHUPS (ESPN -> fallback PFR)
-# ---------------------------
-def fetch_from_espn(year, week):
-    url = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard"
-    params = {"season": year, "week": week}
-    resp = requests.get(url, params=params).json()
-    games = []
-    for event in resp.get("events", []):
-        comp = event["competitions"][0]
-        home = comp["competitors"][0]
-        away = comp["competitors"][1]
-        games.append({
-            "date": event["date"],
-            "home_team": home["team"]["displayName"],
-            "home_score": home["score"],
-            "away_team": away["team"]["displayName"],
-            "away_score": away["score"],
-            "status": comp["status"]["type"]["description"],
-            "source": "ESPN"
-        })
-    return games
-
-def fetch_from_pfr(year, week):
-    url = f"https://www.pro-football-reference.com/years/{year}/games.htm"
-    df = pd.read_html(url)[0]
-    df = df[df["Week"].apply(lambda x: str(x).isdigit())]
-    week_games = df[df["Week"].astype(int) == week]
-    games = []
-    for _, row in week_games.iterrows():
-        if "@" in str(row.get("Unnamed: 5", "")):
-            home_team = row["Loser/tie"]
-            away_team = row["Winner/tie"]
-        else:
-            home_team = row["Winner/tie"]
-            away_team = row["Loser/tie"]
-        games.append({
-            "date": row["Date"],
-            "home_team": home_team,
-            "away_team": away_team,
-            "home_score": None,
-            "away_score": None,
-            "status": "Scheduled",
-            "source": "PFR"
-        })
-    return games
-
-def fetch_current_results(year=2025, week=3):
-    games = fetch_from_espn(year, week)
-    if not games:
-        games = fetch_from_pfr(year, week)
-    return pd.DataFrame(games)
-
-# ---------------------------
-# STREAMLIT APP
-# ---------------------------
-st.title("NFL ELO Predictor 🏈")
-
-# Build ratings
-# --- robust ELO loader (app-safe) ---
+# app.py — current-week, unified with elo_predictor
 import os
+import datetime as dt
 from pathlib import Path
-import elo_predictor as _ep
 
-# See which module file the app is importing (helps catch stale deployments)
+import pandas as pd
+import streamlit as st
+import elo_predictor as _ep
+from elo_predictor import (
+    build_elos,
+    get_team_stats,
+    predict_matchup,
+    fetch_schedule,
+    get_current_week,
+)
+
+st.set_page_config(page_title="NFL ELO Predictor — Current Week", page_icon="🏈", layout="wide")
+st.title("🏈 NFL ELO Predictor — Current Week")
+
+# --- diagnostic: confirm which module/file is live ---
 st.caption(f"ELO module path: {_ep.__file__}")
 st.caption(f"CWD: {os.getcwd()}")
 
-# Try a few likely CSV locations (works on Streamlit Cloud, Docker, local)
+# --- detect current season & week (auto; no widgets) ---
+YEAR = dt.datetime.now().year
+WEEK = get_current_week(YEAR) or 1
+st.markdown(f"**Detected:** {YEAR} — **Week {WEEK}** (auto)")
+
+# --- locate historical_results.csv robustly ---
 candidates = [
     Path("data/historical_results.csv"),
     Path(__file__).parent / "data" / "historical_results.csv",
@@ -83,7 +37,7 @@ if not csv_path:
     st.error("Could not find data/historical_results.csv. Put it in a /data folder next to app.py.")
     st.stop()
 
-# Show the columns so we know the schema the app sees
+# show CSV schema (helps catch column mismatches)
 try:
     _cols = pd.read_csv(csv_path, nrows=1).columns.tolist()
     st.caption(f"historical_results.csv columns: {_cols}")
@@ -91,7 +45,7 @@ except Exception as e:
     st.error(f"Failed to open {csv_path}: {e}")
     st.stop()
 
-# Build ELOs (if this raises, show the traceback in the UI)
+# --- build ELOs (tolerant build_elos in elo_predictor.py) ---
 try:
     elos = build_elos(str(csv_path))
 except Exception as e:
@@ -99,60 +53,58 @@ except Exception as e:
     st.exception(e)
     st.stop()
 
-stats = get_team_stats(2025)
+# team stats for this season
+try:
+    stats = get_team_stats(YEAR)
+except Exception as e:
+    st.error(f"get_team_stats({YEAR}) failed: {e}")
+    st.exception(e)
+    st.stop()
 
-# Auto-fetch current matchups
-week = 3
-year = 2025
-current_df = fetch_current_results(year=year, week=week)
+# --- schedule: use shared fetch_schedule (no duplicate fetchers here) ---
+schedule_df = fetch_schedule(YEAR, WEEK)
+if schedule_df.empty:
+    st.warning("No games found for the current week yet. Hard refresh the browser or check back later.")
+    st.stop()
 
-if not current_df.empty:
-    st.subheader(f"📅 Week {week} Matchups ({year})")
-    st.dataframe(current_df[["date", "home_team", "away_team", "status", "source"]])
-else:
-    st.warning("No games found for this week. Try later.")
+with st.expander("📅 Weekly schedule", expanded=True):
+    view_cols = [c for c in ["date", "away_team", "home_team", "away_score", "home_score", "status", "source"] if c in schedule_df.columns]
+    st.dataframe(schedule_df[view_cols], use_container_width=True)
 
-# Select game from schedule
-if not current_df.empty:
-    games = current_df.apply(lambda x: f"{x['away_team']} @ {x['home_team']}", axis=1).tolist()
-    game_choice = st.selectbox("Choose a game", games)
-    row = current_df.iloc[games.index(game_choice)]
-    team_a = row["home_team"]
-    team_b = row["away_team"]
-    home_team = team_a
-else:
-    # fallback manual mode
-    team_a = st.selectbox("Select Team A", list(elos.keys()))
-    team_b = st.selectbox("Select Team B", list(elos.keys()))
-    home_team = st.selectbox("Home Team (optional)", ["None"] + list(elos.keys()))
-    home_team = None if home_team == "None" else home_team
+# --- single-game prediction from the schedule ---
+games = schedule_df.apply(lambda x: f"{x['away_team']} @ {x['home_team']}", axis=1).tolist()
+choice = st.selectbox("Choose a game", games)
+row = schedule_df.iloc[games.index(choice)]
+home_team = row["home_team"]
+away_team = row["away_team"]
 
-# Single prediction
-if st.button("Predict Selected Game"):
-    result = predict_matchup(team_a, team_b, elos, stats, home_team=home_team)
-    st.write(f"**{team_a} win probability:** {result['final_prob']:.2%}")
-    st.write(f"**{team_b} win probability:** {1-result['final_prob']:.2%}")
+if st.button("Predict selected game"):
+    res = predict_matchup(home_team, away_team, elos, stats, home_team=home_team)
+    p_home = float(res["final_prob"])
+    st.write(f"**{home_team} win probability:** {p_home:.2%}")
+    st.write(f"**{away_team} win probability:** {(1 - p_home):.2%}")
 
-# ---------------------------
-# RANKED SAFEST PICKS
-# ---------------------------
-if not current_df.empty:
-    st.subheader("🔒 Safest Picks This Week")
+# --- ranked safest picks ---
+st.subheader("🔒 Safest Picks This Week")
+ranked = []
+for _, g in schedule_df.iterrows():
+    h, a = g["home_team"], g["away_team"]
+    r = predict_matchup(h, a, elos, stats, home_team=h)
+    p_home = float(r["final_prob"])
+    favorite = h if p_home >= 0.5 else a
+    favp = max(p_home, 1 - p_home)
+    underdog = a if favorite == h else h
+    ranked.append({
+        "Matchup": f"{a} @ {h}",
+        "Favorite": favorite,
+        "Favorite Win %": round(100 * favp, 2),
+        "Underdog": underdog,
+        "Underdog Win %": round(100 * (1 - favp), 2),
+    })
+ranked_df = pd.DataFrame(ranked).sort_values("Favorite Win %", ascending=False, ignore_index=True)
+st.dataframe(ranked_df, use_container_width=True)
 
-    ranked = []
-    for _, row in current_df.iterrows():
-        team_a = row["home_team"]
-        team_b = row["away_team"]
-        result = predict_matchup(team_a, team_b, elos, stats, home_team=team_a)
-
-        ranked.append({
-            "Matchup": f"{team_b} @ {team_a}",
-            "Favorite": team_a if result["final_prob"] >= 0.5 else team_b,
-            "Favorite Win %": max(result["final_prob"], 1 - result["final_prob"]),
-            "Underdog": team_b if result["final_prob"] >= 0.5 else team_a,
-            "Underdog Win %": min(result["final_prob"], 1 - result["final_prob"])
-        })
-
-    ranked_df = pd.DataFrame(ranked).sort_values("Favorite Win %", ascending=False)
-    st.dataframe(ranked_df)
+# manual rerun (no caching in this file)
+if st.button("🔄 Rerun now"):
+    st.experimental_rerun()
 
