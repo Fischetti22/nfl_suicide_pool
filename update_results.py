@@ -72,5 +72,5 @@ def fetch_current_results(year=2025, week=2):
 
 if __name__ == "__main__":
     # Example: Week 2, 2025 season
-    fetch_current_results(year=2025, week=2)
+    fetch_current_results(year=2025, week=3)
 

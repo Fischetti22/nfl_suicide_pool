@@ -50,7 +50,7 @@ def fetch_from_pfr(year, week):
         })
     return games
 
-def fetch_current_results(year=2025, week=2):
+def fetch_current_results(year=2025, week=3):
     games = fetch_from_espn(year, week)
     if not games:
         games = fetch_from_pfr(year, week)
@@ -66,7 +66,7 @@ elos = build_elos("data/historical_results.csv")
 stats = get_team_stats(2025)
 
 # Auto-fetch current matchups
-week = 2
+week = 3
 year = 2025
 current_df = fetch_current_results(year=year, week=week)
 
