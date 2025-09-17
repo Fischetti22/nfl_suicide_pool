@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
-from elo_predictor import build_elos, get_team_stats, predict_matchup
-import requests
+import elo_predictor as _ep
+st.caption(f"ELO module path: {_ep.__file__}")
+
 
 # ---------------------------
 # FETCH MATCHUPS (ESPN -> fallback PFR)
