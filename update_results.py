@@ -4,8 +4,8 @@ import pandas as pd
 def fetch_from_espn(year, week):
     """Fetch games for a given season/week from ESPN"""
     url = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard"
-    params = {"season": year, "week": week}
-    resp = requests.get(url, params=params).json()
+    params = {"year": year, "week": week, "seasontype": 2}
+    resp = requests.get(url, params=params, timeout=20).json()
 
     games = []
     for event in resp.get("events", []):
@@ -55,7 +55,28 @@ def fetch_from_pfr(year, week):
         })
     return games
 
-def fetch_current_results(year=2025, week=3):
+def current_year_week():
+    now = pd.Timestamp.now()
+    year = now.year
+    # ESPN returns week via the API reliably with these params
+    try:
+        url = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard"
+        j = requests.get(url, params={"year": year, "seasontype": 2}, timeout=20).json()
+        wk = (j.get("week") or {}).get("number")
+        if isinstance(wk, int) and 1 <= wk <= 23:
+            return year, wk
+    except Exception:
+        pass
+    # fallback: assume early season
+    return year, 1
+
+
+def fetch_current_results(year=None, week=None):
+    if year is None or week is None:
+        y, w = current_year_week()
+        year = y if year is None else year
+        week = w if week is None else week
+
     games = fetch_from_espn(year, week)
 
     if not games:
@@ -71,6 +92,5 @@ def fetch_current_results(year=2025, week=3):
     print(f"✅ Saved {len(games)} games for {year} Week {week} (source: {games[0]['source']})")
 
 if __name__ == "__main__":
-    # Example: Week 2, 2025 season
-    fetch_current_results(year=2025, week=3)
+    fetch_current_results()
 

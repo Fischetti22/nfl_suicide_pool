@@ -1,17 +1,17 @@
-date,home_team,away_team,home_score,away_score,status,source
-2025-09-18,Buffalo Bills,Miami Dolphins,,,Scheduled,PFR
-2025-09-21,Carolina Panthers,Atlanta Falcons,,,Scheduled,PFR
-2025-09-21,Minnesota Vikings,Cincinnati Bengals,,,Scheduled,PFR
-2025-09-21,Tennessee Titans,Indianapolis Colts,,,Scheduled,PFR
-2025-09-21,Cleveland Browns,Green Bay Packers,,,Scheduled,PFR
-2025-09-21,Jacksonville Jaguars,Houston Texans,,,Scheduled,PFR
-2025-09-21,Tampa Bay Buccaneers,New York Jets,,,Scheduled,PFR
-2025-09-21,New England Patriots,Pittsburgh Steelers,,,Scheduled,PFR
-2025-09-21,Washington Commanders,Las Vegas Raiders,,,Scheduled,PFR
-2025-09-21,Philadelphia Eagles,Los Angeles Rams,,,Scheduled,PFR
-2025-09-21,Los Angeles Chargers,Denver Broncos,,,Scheduled,PFR
-2025-09-21,Seattle Seahawks,New Orleans Saints,,,Scheduled,PFR
-2025-09-21,San Francisco 49ers,Arizona Cardinals,,,Scheduled,PFR
-2025-09-21,Chicago Bears,Dallas Cowboys,,,Scheduled,PFR
-2025-09-21,New York Giants,Kansas City Chiefs,,,Scheduled,PFR
-2025-09-22,Baltimore Ravens,Detroit Lions,,,Scheduled,PFR
+date,home_team,home_score,away_team,away_score,status,source
+2025-09-12T00:15Z,Green Bay Packers,27,Washington Commanders,18,Final,ESPN
+2025-09-14T17:00Z,Cincinnati Bengals,31,Jacksonville Jaguars,27,Final,ESPN
+2025-09-14T17:00Z,Dallas Cowboys,40,New York Giants,37,Final,ESPN
+2025-09-14T17:00Z,Detroit Lions,52,Chicago Bears,21,Final,ESPN
+2025-09-14T17:00Z,Tennessee Titans,19,Los Angeles Rams,33,Final,ESPN
+2025-09-14T17:00Z,Miami Dolphins,27,New England Patriots,33,Final,ESPN
+2025-09-14T17:00Z,New Orleans Saints,21,San Francisco 49ers,26,Final,ESPN
+2025-09-14T17:00Z,New York Jets,10,Buffalo Bills,30,Final,ESPN
+2025-09-14T17:00Z,Pittsburgh Steelers,17,Seattle Seahawks,31,Final,ESPN
+2025-09-14T17:00Z,Baltimore Ravens,41,Cleveland Browns,17,Final,ESPN
+2025-09-14T20:05Z,Indianapolis Colts,29,Denver Broncos,28,Final,ESPN
+2025-09-14T20:05Z,Arizona Cardinals,27,Carolina Panthers,22,Final,ESPN
+2025-09-14T20:25Z,Kansas City Chiefs,17,Philadelphia Eagles,20,Final,ESPN
+2025-09-15T00:20Z,Minnesota Vikings,6,Atlanta Falcons,22,Final,ESPN
+2025-09-15T23:00Z,Houston Texans,19,Tampa Bay Buccaneers,20,Final,ESPN
+2025-09-16T02:00Z,Las Vegas Raiders,9,Los Angeles Chargers,20,Final,ESPN

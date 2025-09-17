@@ -105,7 +105,9 @@ def build_elos(csv_path="data/historical_results.csv"):
 # ---------------------------
 # TEAM STATS SCRAPER
 # ---------------------------
-def get_team_stats(year=2024):
+def get_team_stats(year=None):
+    if year is None:
+        year = pd.Timestamp.now().year
     url = f"https://www.pro-football-reference.com/years/{year}/"
     tables = pd.read_html(url)
     stats = tables[0]
@@ -184,7 +186,9 @@ def predict_matchup(team_a, team_b, elos, stats, home_team=None):
 # ---------------------------
 def predict_week(csv_path="data/current_results.csv",
                  hist_path="data/historical_results.csv",
-                 year=2024):
+                 year=None):
+    if year is None:
+        year = pd.Timestamp.now().year
     elos = build_elos(hist_path)
     stats = get_team_stats(year)
     current = pd.read_csv(csv_path)
