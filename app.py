@@ -115,6 +115,29 @@ for _, g in schedule_df.iterrows():
     })
 st.dataframe(pd.DataFrame(ranked_rows).sort_values("Favorite Win %", ascending=False, ignore_index=True),
              use_container_width=True)
+             
+# --- detect week and auto-advance if the whole week is Final ---
+YEAR = dt.datetime.now().year
+WEEK = get_current_week(YEAR) or 1
+
+# fetch detected week
+schedule_df = fetch_schedule(YEAR, WEEK)
+
+def _all_final(df):
+    if df.empty or "status" not in df.columns:
+        return False
+    s = df["status"].astype(str).str.lower()
+    return s.notna().all() and (s == "final").all()
+
+# if everything in the detected week is Final, try week+1
+if _all_final(schedule_df) and WEEK < 23:
+    next_df = fetch_schedule(YEAR, WEEK + 1)
+    if not next_df.empty:
+        WEEK += 1
+        schedule_df = next_df
+
+st.markdown(f"**Detected:** {YEAR} — **Week {WEEK}**")
+
 
 # Manual rerun
 if st.button("🔄 Rerun now"):
